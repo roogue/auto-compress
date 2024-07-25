@@ -1,19 +1,51 @@
 import { input, select } from "@inquirer/prompts";
 import ffmpeg from "fluent-ffmpeg";
 import _path from "path";
+import { exec } from "child_process";
 
 interface VideoData {
+  path: string;
   fps: number;
   duration: number;
   name: string;
 }
 
 (async () => {
-  const rawPathToVideo = await input({message: "Path to File: "});
-  const pathToVideo = _path.resolve(__dirname, rawPathToVideo);
-
   const videoData = {} as VideoData;
-  ffmpeg.ffprobe(pathToVideo, (_, metadata) => {
+
+  const linuxCommand = `bash ${_path.join(
+    __dirname,
+    "../script/openDialog.sh"
+  )}`;
+  const winCommand = `powershell -ExecutionPolicy Bypass -File ${_path.join(
+    __dirname,
+    "../script/openDialog.ps1"
+  )}`;
+
+  if (process.platform === "linux" || process.platform === "win32") {
+    await new Promise<void>((resolve, reject) => {
+      exec(
+        process.platform === "linux" ? linuxCommand : winCommand,
+        (err, stdout, stderr) => {
+          if (err || stderr) {
+            console.log(err, stderr);
+            reject();
+          }
+
+          const output = stdout.trim();
+          if (output === "UserCancelled") {
+            process.exit();
+          } else {
+            videoData.path = _path.resolve(__dirname, output);
+          }
+
+          resolve();
+        }
+      );
+    });
+  }
+
+  ffmpeg.ffprobe(videoData.path, (_, metadata) => {
     // FPS
     const frameRateString =
       metadata.streams[0].r_frame_rate?.split("/") || null;
@@ -50,31 +82,31 @@ interface VideoData {
   }
 
   const targetAudioBitrate = await select({
-    message: "Targetted FPS: ",
-    default: "128k",
+    message: "Targetted Audio Bitrate(kbps): ",
+    default: 128,
     choices: [
       {
         name: "32kbps",
         description: "very compressed (literally no details)",
-        value: "32k",
+        value: 32,
       },
-      { name: "64kbps", description: "low quality streaming", value: "64k" },
-      { name: "128kbps", description: "best for social media", value: "128k" },
-      { name: "192kbps", description: "better audio quality", value: "192k" },
-      { name: "No compression", value: "" },
+      { name: "64kbps", description: "low quality streaming", value: 64 },
+      { name: "128kbps", description: "best for social media", value: 128 },
+      { name: "192kbps", description: "better audio quality", value: 192 },
+      { name: "No compression", value: 0 },
     ],
   });
 
   let targetSize = await select({
-    message: "Targetted File Size: ",
-    default: 35,
+    message: "Targetted File Size(MB): ",
+    default: 30,
     choices: [
-      { name: "8 MB", description: "Discord", value: 8 },
-      { name: "25 MB", description: "Facebook", value: 25 },
-      { name: "35 MB", description: "Whatsapp", value: 35 },
-      { name: "100 MB", description: "Discord Nitro", value: 100 },
-      { name: "287 MB", description: "Tiktok", value: 287 },
-      { name: "512 MB", description: "Tweeter", value: 512 },
+      { name: "8 MB", description: "Discord", value: 7 },
+      { name: "25 MB", description: "Facebook", value: 20 },
+      { name: "35 MB", description: "Whatsapp", value: 30 },
+      { name: "100 MB", description: "Discord Nitro", value: 90 },
+      { name: "287 MB", description: "Tiktok", value: 270 },
+      { name: "512 MB", description: "Tweeter", value: 500 },
       { name: "Other", value: 0 },
     ],
   });
@@ -83,20 +115,41 @@ interface VideoData {
   }
 
   const targetBitrate =
-    ((targetSize * 1e6 * 8) / videoData.duration / 1000) * 0.90; // 10% less
+    ((targetSize * 1e6 * 8) / videoData.duration / 1000 - targetAudioBitrate) *
+    0.97; // 3% less
 
-  ffmpeg()
-    .addInput(pathToVideo)
+  let totalTime: number;
+  const ffmpegCommand = ffmpeg()
+    .on("start", () => {
+      console.log("Compressing...")
+    })
+    .on("codecData", (data) => {
+      totalTime = parseInt(data.duration.replace(/:/g, ""));
+    })
+    .on("progress", (progress) => {
+      const time = parseInt(progress.timemark.replace(/:/g, ""));
+      const percent = Math.round((time / totalTime) * 100);
+
+      console.log(percent + "%");
+    })
+    .on("error", (err) => {
+      console.log(err);
+    })
+    .addInput(videoData.path)
     .withOutputFps(targetFPS)
     .videoCodec("nvenc_hevc")
     .videoBitrate(targetBitrate + "k")
-    .audioBitrate(targetAudioBitrate)
     .addOutput(
       _path.format({
-        ..._path.parse(pathToVideo),
+        ..._path.parse(videoData.path),
         base: "",
         ext: "_resized.mp4",
       })
-    )
-    .run();
+    );
+
+  if (targetAudioBitrate) {
+    ffmpegCommand.audioBitrate(targetAudioBitrate + "k");
+  }
+
+  ffmpegCommand.run();
 })();

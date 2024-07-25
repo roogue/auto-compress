@@ -14,7 +14,7 @@
     "build-exe-win": "pkg ./dist/index.js -o ./build/win-x64/auto-compress.exe -t node20-win-x64",
     "build-cp": "yarn build-cp-linux && yarn build-cp-win",
     "build-cp-linux": "mkdir ./build/linux-x64/script && cp ./script/openDialog.sh ./build/linux-x64/script/openDialog.sh",
-    "build-cp-win": "mkdir ./build/win-x64/script && cp ./script/openDialog.ps1 ./build/linux-x64/script/openDialog.ps1",
+    "build-cp-win": "mkdir ./build/win-x64/script && cp ./script/openDialog.ps1 ./build/win-x64/script/openDialog.ps1",
     "build-compress": "yarn build-compress-linux && yarn build-compress-win",
     "build-compress-linux": "tar -cJvf ./build/auto-compress.linux-x64.tar.xz ./build/linux-x64",
     "build-compress-win": "7z a ./build/auto-compress.win-x64.7z ./build/win-x64",

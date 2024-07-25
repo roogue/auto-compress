@@ -13,13 +13,11 @@ interface VideoData {
 (async () => {
   const videoData = {} as VideoData;
 
-  const linuxCommand = `bash ${_path.join(
-    __dirname,
-    "../script/openDialog.sh"
-  )}`;
+  const cwd = process.cwd();
+  const linuxCommand = `bash ${_path.join(cwd, "/script/openDialog.sh")}`;
   const winCommand = `powershell -ExecutionPolicy Bypass -File ${_path.join(
-    __dirname,
-    "../script/openDialog.ps1"
+    cwd,
+    "/script/openDialog.ps1"
   )}`;
 
   if (process.platform === "linux" || process.platform === "win32") {
@@ -36,7 +34,7 @@ interface VideoData {
           if (output === "UserCancelled") {
             process.exit();
           } else {
-            videoData.path = _path.resolve(__dirname, output);
+            videoData.path = _path.resolve(cwd, output);
           }
 
           resolve();
@@ -121,7 +119,7 @@ interface VideoData {
   let totalTime: number;
   const ffmpegCommand = ffmpeg()
     .on("start", () => {
-      console.log("Compressing...")
+      console.log("Compressing...");
     })
     .on("codecData", (data) => {
       totalTime = parseInt(data.duration.replace(/:/g, ""));

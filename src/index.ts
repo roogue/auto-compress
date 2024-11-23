@@ -25,10 +25,10 @@ interface VideoData {
       exec(
         process.platform === "linux" ? linuxCommand : winCommand,
         (err, stdout, stderr) => {
-          if (err || stderr) {
-            console.log(err, stderr);
-            reject();
-          }
+          // if (err || stderr) {
+          //   console.log(err, stderr);
+          //   reject();
+          // }
 
           const output = stdout.trim();
           if (output === "UserCancelled") {
@@ -101,7 +101,7 @@ interface VideoData {
     choices: [
       { name: "8 MB", description: "Discord", value: 7 },
       { name: "25 MB", description: "Facebook", value: 20 },
-      { name: "35 MB", description: "Whatsapp", value: 30 },
+      { name: "32 MB", description: "Whatsapp", value: 28 },
       { name: "100 MB", description: "Discord Nitro", value: 90 },
       { name: "287 MB", description: "Tiktok", value: 270 },
       { name: "512 MB", description: "Tweeter", value: 500 },
@@ -116,6 +116,11 @@ interface VideoData {
     ((targetSize * 1e6 * 8) / videoData.duration / 1000 - targetAudioBitrate) *
     0.97; // 3% less
 
+  let encoder: string = await input({
+    message: "Encoder(default: hevc_nvenc): ",
+  });
+  if (encoder === "") { encoder = "hevc_nvenc" }
+
   let totalTime: number;
   const ffmpegCommand = ffmpeg()
     .on("start", () => {
@@ -128,14 +133,14 @@ interface VideoData {
       const time = parseInt(progress.timemark.replace(/:/g, ""));
       const percent = Math.round((time / totalTime) * 100);
 
-      console.log(percent + "%");
+      console.log(isNaN(percent) ? 0 : percent + "%");
     })
     .on("error", (err) => {
       console.log(err);
     })
     .addInput(videoData.path)
     .withOutputFps(targetFPS)
-    .videoCodec("nvenc_hevc")
+    .videoCodec(encoder)
     .videoBitrate(targetBitrate + "k")
     .addOutput(
       _path.format({
